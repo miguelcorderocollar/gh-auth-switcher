@@ -9,6 +9,7 @@ A simple macOS menu bar app to switch between authenticated GitHub CLI accounts 
 - Runs `gh auth setup-git` after switching
 - Lets you assign one of 10 colors per account
 - Shows the active account color as the menu bar badge
+- **Git profile sync**: In Settings, pick a git profile per account; when you switch, `git config --global user.name` and `user.email` are updated. Profiles come from ~/.gitconfig and any [include]/[includeIf] files; you can also add custom profiles manually.
 
 ## Requirements
 

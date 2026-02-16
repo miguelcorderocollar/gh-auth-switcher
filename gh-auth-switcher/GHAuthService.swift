@@ -101,6 +101,44 @@ final class GHAuthService {
         _ = try await runGH(arguments: ["auth", "setup-git", "--hostname", host])
     }
 
+    /// Applies git config --global user.name and user.email. Ignores errors (git may not be installed).
+    nonisolated func applyGitProfile(name: String, email: String) async {
+        let nameTrimmed = name.trimmingCharacters(in: .whitespaces)
+        let emailTrimmed = email.trimmingCharacters(in: .whitespaces)
+        guard !nameTrimmed.isEmpty || !emailTrimmed.isEmpty else { return }
+
+        if !nameTrimmed.isEmpty {
+            _ = try? await runCommand(executable: "/usr/bin/git", arguments: ["config", "--global", "user.name", nameTrimmed])
+        }
+        if !emailTrimmed.isEmpty {
+            _ = try? await runCommand(executable: "/usr/bin/git", arguments: ["config", "--global", "user.email", emailTrimmed])
+        }
+    }
+
+    nonisolated private func runCommand(executable: String, arguments: [String]) async throws -> CommandOutput {
+        try await Task.detached(priority: .userInitiated) {
+            try self.runCommandSync(executable: executable, arguments: arguments)
+        }.value
+    }
+
+    nonisolated private func runCommandSync(executable: String, arguments: [String]) throws -> CommandOutput {
+        let process = Process()
+        let stdoutPipe = Pipe()
+        let stderrPipe = Pipe()
+
+        process.executableURL = URL(fileURLWithPath: executable)
+        process.arguments = arguments
+        process.standardOutput = stdoutPipe
+        process.standardError = stderrPipe
+
+        try? process.run()
+        process.waitUntilExit()
+
+        let stdout = String(decoding: stdoutPipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+        let stderr = String(decoding: stderrPipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+        return CommandOutput(stdout: stdout, stderr: stderr)
+    }
+
     nonisolated private func runGH(arguments: [String]) async throws -> CommandOutput {
         try await Task.detached(priority: .userInitiated) {
             try self.runGHSync(arguments: arguments)

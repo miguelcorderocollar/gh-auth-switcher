@@ -61,7 +61,7 @@ struct ContentView: View {
                     Circle()
                         .fill(appState.color(for: activeAccount))
                         .frame(width: 10, height: 10)
-                    Text("\(activeAccount.login)@\(activeAccount.host)")
+                    Text(appState.displayName(for: activeAccount))
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
@@ -211,12 +211,18 @@ private struct AccountRowView: View {
                     .frame(width: 12, height: 12)
 
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(account.login)
+                    Text(appState.displayName(for: account))
                         .font(.subheadline)
                         .fontWeight(.medium)
-                    Text(account.host)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    if appState.accountLabel(for: account) != nil {
+                        Text("\(account.login)@\(account.host)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text(account.host)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
 
                 Spacer()

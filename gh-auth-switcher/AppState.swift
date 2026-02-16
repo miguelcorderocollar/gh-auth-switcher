@@ -10,6 +10,7 @@ final class AppState: ObservableObject {
     }
 
     @Published private(set) var accounts: [GHAccount] = []
+    @Published private(set) var discoveredGitProfiles: [GitProfile] = []
     @Published private(set) var isRefreshing = false
     @Published private(set) var switchingAccountID: String?
     @Published private(set) var hasLoaded = false
@@ -17,6 +18,7 @@ final class AppState: ObservableObject {
 
     private let service: GHAuthService
     private let store: AccountStore
+    private let gitDiscovery = GitProfileDiscovery()
     private var lastAction: RetryAction = .refresh
 
     enum RetryAction {
@@ -100,6 +102,10 @@ final class AppState: ObservableObject {
 
         do {
             try await service.switchAccount(host: account.host, login: account.login)
+            let profile = store.gitProfile(for: account.id)
+            if !profile.isEmpty {
+                await service.applyGitProfile(name: profile.name, email: profile.email)
+            }
             accounts = try await service.fetchAccounts()
         } catch {
             errorBanner = mapError(error)
@@ -130,6 +136,57 @@ final class AppState: ObservableObject {
     func assignColor(index: Int, to account: GHAccount) {
         store.setColorIndex(index, for: account.id)
         objectWillChange.send()
+    }
+
+    func gitProfile(for account: GHAccount) -> GitProfile {
+        store.gitProfile(for: account.id)
+    }
+
+    func setGitProfile(_ profile: GitProfile, for account: GHAccount) {
+        store.setGitProfile(profile, for: account.id)
+        objectWillChange.send()
+    }
+
+    func refreshDiscoveredGitProfiles() async {
+        let fromConfig = await gitDiscovery.discoverProfiles()
+        let manual = store.manualGitProfiles()
+        var combined = fromConfig
+        for p in manual where !combined.contains(p) {
+            combined.append(p)
+        }
+        combined.sort { $0.displayString.localizedCaseInsensitiveCompare($1.displayString) == .orderedAscending }
+        discoveredGitProfiles = combined
+    }
+
+    func addManualProfile(_ profile: GitProfile) {
+        store.addManualProfile(profile)
+        Task { await refreshDiscoveredGitProfiles() }
+    }
+
+    func removeManualProfile(_ profile: GitProfile) {
+        store.removeManualProfile(profile)
+        objectWillChange.send()
+        Task { await refreshDiscoveredGitProfiles() }
+    }
+
+    var manualProfiles: [GitProfile] {
+        store.manualGitProfiles()
+    }
+
+    func accountLabel(for account: GHAccount) -> String? {
+        store.accountLabel(for: account.id)
+    }
+
+    func setAccountLabel(_ label: String?, for account: GHAccount) {
+        store.setAccountLabel(label, for: account.id)
+        objectWillChange.send()
+    }
+
+    func displayName(for account: GHAccount) -> String {
+        if let label = store.accountLabel(for: account.id), !label.isEmpty {
+            return label
+        }
+        return "\(account.login)@\(account.host)"
     }
 
     private func mapError(_ error: Error) -> ErrorBanner {
