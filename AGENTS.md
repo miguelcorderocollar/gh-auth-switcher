@@ -24,6 +24,36 @@ If Xcode has a build database lock, use a custom DerivedData path:
 xcodebuild -project "gh-auth-switcher.xcodeproj" -scheme "gh-auth-switcher" -configuration Debug -destination 'platform=macOS' -derivedDataPath ".build/DerivedData" build
 ```
 
+For this menu bar app, a plain `open` is not a reliable relaunch because the old accessory app process may keep running with the previous status item. Use this sequence instead after rebuilding:
+
+```bash
+osascript -e 'tell application "gh-auth-switcher" to quit'
+open ".build/DerivedData/Build/Products/Debug/gh-auth-switcher.app"
+```
+
+If the running app name is not resolvable by AppleScript, quit it from Activity Monitor or the menu bar item first, then launch the built app bundle above.
+
+Installed app bundle path:
+
+```bash
+/Applications/gh-auth-switcher.app
+```
+
+Recommended update flow after a successful local build:
+
+```bash
+pkill -x gh-auth-switcher || true
+rm -rf /Applications/gh-auth-switcher.app
+cp -R ".build/DerivedData/Build/Products/Debug/gh-auth-switcher.app" /Applications/
+open "/Applications/gh-auth-switcher.app"
+```
+
+Notes:
+
+- Use `pkill -x gh-auth-switcher` before replacing the installed bundle, otherwise the old accessory process can survive and keep the old menu bar item alive.
+- Treat the DerivedData app as the development build and `/Applications/gh-auth-switcher.app` as the installed app to validate before merging.
+- After validating the installed app, create/push the branch, open the PR, and only approve/merge once the installed build behavior is confirmed.
+
 ## Coding Conventions
 
 - Keep implementation minimal and focused on menu bar UX.

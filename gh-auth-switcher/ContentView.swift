@@ -250,7 +250,11 @@ private struct AccountRowView: View {
     }
 }
 
-#Preview {
-    ContentView()
-        .environmentObject(AppState.preview)
+#if DEBUG
+struct ContentView_Previews: PreviewProvider {
+    static var previews: some View {
+        ContentView()
+            .environmentObject(AppState.preview)
+    }
 }
+#endif
