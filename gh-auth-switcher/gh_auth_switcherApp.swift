@@ -9,18 +9,11 @@ import SwiftUI
 
 @main
 struct gh_auth_switcherApp: App {
-    @StateObject private var appState = AppState()
+    @NSApplicationDelegateAdaptor(StatusItemAppDelegate.self) private var appDelegate
 
     var body: some Scene {
-        MenuBarExtra {
-            ContentView()
-                .environmentObject(appState)
-        } label: {
-            StatusIconRenderer(
-                color: appState.menuBarColor,
-                hasError: appState.hasError
-            )
+        Settings {
+            EmptyView()
         }
-        .menuBarExtraStyle(.window)
     }
 }
