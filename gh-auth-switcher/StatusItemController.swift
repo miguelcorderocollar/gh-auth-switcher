@@ -3,13 +3,15 @@ import Combine
 import SwiftUI
 
 @MainActor
-final class StatusItemController: NSObject {
+final class StatusItemController: NSObject, NSPopoverDelegate {
     private let appState: AppState
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
     private let popover = NSPopover()
     private let hostingController: NSHostingController<AnyView>
     private let iconView = StatusIconView(frame: NSRect(x: 0, y: 0, width: 18, height: 18))
     private let badgeView = StatusBadgeView(frame: NSRect(x: 0, y: 0, width: 9, height: 9))
+    private var globalClickMonitor: Any?
+    private var localClickMonitor: Any?
     private var cancellables = Set<AnyCancellable>()
 
     init(appState: AppState) {
@@ -30,6 +32,7 @@ final class StatusItemController: NSObject {
     }
 
     private func configurePopover() {
+        popover.delegate = self
         popover.behavior = .transient
         popover.animates = false
         popover.contentViewController = hostingController
@@ -84,8 +87,13 @@ final class StatusItemController: NSObject {
 
         updatePopoverSize()
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+        installClickMonitors()
         popover.contentViewController?.view.window?.becomeKey()
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    func popoverDidClose(_ notification: Notification) {
+        removeClickMonitors()
     }
 
     private func updateStatusAppearance() {
@@ -128,6 +136,60 @@ final class StatusItemController: NSObject {
             width: max(280, fittingSize.width),
             height: max(120, fittingSize.height)
         )
+    }
+
+    private func installClickMonitors() {
+        removeClickMonitors()
+
+        globalClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
+            Task { @MainActor in
+                self?.closePopover()
+            }
+        }
+
+        localClickMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
+            self?.handleLocalClick(event)
+            return event
+        }
+    }
+
+    private func handleLocalClick(_ event: NSEvent) {
+        guard popover.isShown else {
+            return
+        }
+
+        guard let popoverWindow = popover.contentViewController?.view.window else {
+            closePopover()
+            return
+        }
+
+        if event.window === popoverWindow || event.window === statusItem.button?.window {
+            return
+        }
+
+        closePopover()
+    }
+
+    private func closePopover() {
+        guard popover.isShown else {
+            removeClickMonitors()
+            return
+        }
+
+        popover.performClose(nil)
+        removeClickMonitors()
+    }
+
+    private func removeClickMonitors() {
+        if let globalClickMonitor {
+            NSEvent.removeMonitor(globalClickMonitor)
+            self.globalClickMonitor = nil
+        }
+
+        if let localClickMonitor {
+            NSEvent.removeMonitor(localClickMonitor)
+            self.localClickMonitor = nil
+        }
     }
 }
 
